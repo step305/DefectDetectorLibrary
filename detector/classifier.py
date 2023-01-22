@@ -63,7 +63,7 @@ class Classifier:
         for im_path in images_paths:
             image = cv2.imread(im_path)
             # get the ground truth class
-            gt_class = im_path.split('/')[-2]
+            gt_class = im_path.split('\\')[-2]
             t0 = time.time()
             prediction, probability = self.test(image)
             t1 = time.time()
