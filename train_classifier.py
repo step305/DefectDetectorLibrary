@@ -37,21 +37,21 @@ def train(cnn_model, data_loader, train_criterion, train_optimizer=None, is_vali
             # do forward pass
             outputs = cnn_model(image)
             # calculate the loss between estimation and target
-            loss = train_criterion(outputs, labels)
-            loss += loss.item()
+            loss_ = train_criterion(outputs, labels)
             # calculate the accuracy
             _, predictions = torch.max(outputs.data, 1)
             correct += sum([1 if prediction == label else 0 for prediction, label in zip(predictions, labels)])
+            loss += sum([0 if prediction == label else 1 for prediction, label in zip(predictions, labels)])
             if not is_validation:
                 # do loss backpropagation
-                loss.backward()
+                loss_.backward()
                 # update the optimizer
                 train_optimizer.step()
     performance_time = time.time() - performance_time
 
     # loss and accuracy for the epoch
-    epoch_loss = loss / counter
-    epoch_acc = 100. * (correct / len(data_loader.dataset))
+    epoch_loss = 100.0 * float(loss) / len(data_loader.dataset)
+    epoch_acc = 100.0 * float(correct) / len(data_loader.dataset)
     return epoch_loss, epoch_acc, performance_time
 
 

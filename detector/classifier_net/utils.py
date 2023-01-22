@@ -1,7 +1,7 @@
 import torch
-from CNNModel import CNNModel
+from detector.classifier_net.CNNModel import CNNModel
 import matplotlib
-matplotlib.use('Agg')
+#matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 
