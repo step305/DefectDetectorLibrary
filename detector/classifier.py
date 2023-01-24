@@ -1,7 +1,7 @@
 import torch
 import cv2
 import torchvision.transforms as transforms
-import classifier_net.utils as utils
+import detector.classifier_net.utils as utils
 import time
 import os
 import torch.nn.functional as nn_functional
@@ -44,8 +44,8 @@ class Classifier:
 
     def verification(self):
         test_images_paths = [
-            os.path.abspath(os.path.join(os.path.curdir, '..\\dataset/classification/train')),
-            os.path.abspath(os.path.join(os.path.curdir, '..\\dataset/classification/validation'))
+            os.path.abspath(os.path.join(os.path.curdir, 'dataset/classification/train')),
+            os.path.abspath(os.path.join(os.path.curdir, 'dataset/classification/validation'))
         ]
         images_paths = []
         for sub_folder_path in test_images_paths:

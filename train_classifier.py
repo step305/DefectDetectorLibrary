@@ -39,7 +39,7 @@ def train(cnn_model, data_loader, train_criterion, train_optimizer=None, is_vali
             # calculate the loss between estimation and target
             loss_ = train_criterion(outputs, labels)
             # calculate the accuracy
-            _, predictions = torch.max(outputs.data, 1)
+            _, predictions = torch.max(outputs.torch_data, 1)
             correct += sum([1 if prediction == label else 0 for prediction, label in zip(predictions, labels)])
             loss += sum([0 if prediction == label else 1 for prediction, label in zip(predictions, labels)])
             if not is_validation:

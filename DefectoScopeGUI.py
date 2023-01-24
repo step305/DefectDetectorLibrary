@@ -6,6 +6,9 @@ from PIL import ImageTk as PIL_Image_Tk
 import cv2
 import numpy as np
 import os
+import net_test
+from detector import classifier
+from detector import detector_t
 
 WINDOW_SIZE = (1024, 600)
 VIDEO_FRAME_SIZE = (768, 480)  # WVGA
@@ -71,10 +74,94 @@ def select_test_dialog(root):
     return ('Classifier', 'Detector')[d.num]
 
 
+def center_window(w, size):
+    s_w = w.winfo_screenwidth()
+    s_h = w.winfo_screenheight()
+    s_xc = int((s_w / 2) - (size[0] / 2))
+    s_yc = int((s_h / 2) - (size[1] / 2))
+    w.geometry('{}x{}+{}+{}'.format(size[0], size[1], s_xc, s_yc))
+    return w
+
+
+def wait_window(root):
+    win = tk.Toplevel(root)
+    win = center_window(win, (400, 160))
+    win.resizable(False, False)
+    win.configure(bg=BACKGROUND_COLOR)
+    win.transient()
+    win.overrideredirect(True)
+    win.grab_set()
+    lbl = tk.Label(win, text='Wait! Test in progress...', bg=BACKGROUND_COLOR, font=("Arial", 23))
+    lbl.place(relx=0.5, rely=0.5, anchor="center")
+    return win
+
+
+def report_window(root, text):
+    win = tk.Toplevel(root)
+    win = center_window(win, (900, 500))
+    win.resizable(False, False)
+    win.configure(bg=BACKGROUND_COLOR)
+    win.transient()
+    win.title('Results!')
+    win.grab_set()
+    tk.Label(win, text=text, anchor='w', justify=tk.LEFT, bg=BACKGROUND_COLOR, font=("Courier", 14)).pack()
+    btn = tk.Button(win, text='Ok', command=win.destroy)
+    btn.place(x=400, y=400, width=100, height=70, anchor='center')
+    return win
+
+
+def wait_classifier_test_end(root, wait_win):
+    if net_test.is_ready():
+        res = net_test.report()
+        wait_win.destroy()
+        report_text = '*' * 80 + '\n' + \
+                      'Testing results:\n' + \
+                      '{:<50}: {:20d}\n'.format('Total images tested', res['total_images']) + \
+                      '{:<50}: {:20d}\n'.format('True Positive checks', res['tp_n']) + \
+                      '{:<50}: {:20d}\n'.format('False Negative checks', res['fn_n']) + \
+                      '{:<50}: {:20d}\n'.format('False Positive checks', res['fp_n']) + \
+                      '{:<50}: {:19.3f}%\n'.format('Precision', res['precision']) + \
+                      '{:<50}: {:19.3f}%\n'.format('Recall', res['recall']) + \
+                      '{:<50}: {:19.3f}%\n\n'.format('Probability of wrong classification', res['prob_error']) + \
+                      '{:<50}: {:18.3f}ms\n'.format('Average timing for classification', res['average_t']) + \
+                      '{:<50}: {:18.3f}ms\n'.format('Maximum timing for classification', res['max_t']) + \
+                      '{:<50}: {:18.3f}ms'.format('Standard deviation of timing for classification', res['std_t'])
+        report_window(root, report_text)
+        test_button['state'] = 'normal'
+    else:
+        root.after(100, wait_classifier_test_end, root, wait_win)
+
+
+def wait_detector_test_end(root, wait_win):
+    if net_test.is_ready():
+        res = net_test.report()
+        wait_win.destroy()
+        report_text = '*' * 80 + '\n' + \
+                      'Testing results:\n' + \
+                      '{:<50}: {:20d}\n'.format('Total images tested', res['total_images']) + \
+                      '{:<50}: {:19.2f}%\n\n'.format('Mean Average Precision (mAP50)', res['mAP50']) + \
+                      '{:<50}: {:18.3f}ms\n'.format('Average timing for classification', res['average_t']) + \
+                      '{:<50}: {:18.3f}ms\n'.format('Maximum timing for classification', res['max_t']) + \
+                      '{:<50}: {:18.3f}ms'.format('Standard deviation of timing for classification', res['std_t'])
+        report_window(root, report_text)
+        test_button['state'] = 'normal'
+    else:
+        root.after(100, wait_detector_test_end, root, wait_win)
+
+
 def test_action(root):
     test_type = select_test_dialog(root)
     if test_type is not None:
-        print('test', test_type)
+        if test_type == 'Classifier':
+            test_button['state'] = 'disabled'
+            net_test.run_test(classifier.Classifier, 'detector\\models\\classification_model.pth')
+            test_wait_win = wait_window(root)
+            root.after(100, wait_classifier_test_end, root, test_wait_win)
+        elif test_type == 'Detector':
+            test_button['state'] = 'disabled'
+            net_test.run_test(detector_t.Detector, 'detector\\models\\rcnn\\5.torch')
+            test_wait_win = wait_window(root)
+            root.after(100, wait_detector_test_end, root, test_wait_win)
 
 
 def load_icon(icon_name):
@@ -100,12 +187,7 @@ def on_closing(root):
 
 if __name__ == '__main__':
     main_window = tk.Tk()
-    screen_width = main_window.winfo_screenwidth()
-    screen_height = main_window.winfo_screenheight()
-
-    xc = int((screen_width / 2) - (WINDOW_SIZE[0] / 2))
-    yc = int((screen_height / 2) - (WINDOW_SIZE[1] / 2))
-    main_window.geometry('{}x{}+{}+{}'.format(WINDOW_SIZE[0], WINDOW_SIZE[1], xc, yc))
+    main_window = center_window(main_window, WINDOW_SIZE)
     main_window.resizable(False, False)
     main_window.configure(bg=BACKGROUND_COLOR)
     # main_window.wm_attributes('-fullscreen', 'True')
