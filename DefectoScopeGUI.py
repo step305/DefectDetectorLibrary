@@ -25,6 +25,7 @@ MODEL_CLASSIFIER_PATH = 'detector\\models\\classification_model.pth'
 net_analyzer = None
 camera = None
 stop_event = mp.Event()
+video_panel_image = None
 
 plane_id = {
     'name': "",
@@ -220,11 +221,13 @@ def on_closing(root):
 
 def update_action(root, video_panel):
     global camera
+    global video_panel_image
     img = camera.get()
     if img is not None:
         img = cv2.resize(img, VIDEO_FRAME_SIZE)
-        img_tk = bgr_to_tk_image(img)
-        #video_panel.configure(image=img_tk)
+        video_panel_image = bgr_to_tk_image(img)
+        video_panel.configure(image=video_panel_image)
+        video_panel.image = video_panel_image
     if not stop_event.is_set():
         root.after(ms=30, func=lambda: update_action(root, video_panel))
 
@@ -237,10 +240,10 @@ if __name__ == '__main__':
     # main_window.wm_attributes('-fullscreen', 'True')
 
     frame = np.random.randint(0, 255, size=(VIDEO_FRAME_SIZE[1], VIDEO_FRAME_SIZE[0], 3), dtype=np.uint8)
-    frame_tk = bgr_to_tk_image(frame)
+    video_panel_image = bgr_to_tk_image(frame)
 
     video_out = tk.Label(main_window,
-                         image=frame_tk,
+                         image=video_panel_image,
                          width=VIDEO_FRAME_SIZE[0],
                          height=VIDEO_FRAME_SIZE[1],
                          borderwidth=2,

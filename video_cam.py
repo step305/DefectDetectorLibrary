@@ -36,5 +36,5 @@ class VideoCamera:
 
     def stop(self):
         self.stop_event.set()
-        self.cam_proc.join()
+        self.cam_proc.terminate()
         print('Camera terminated')
