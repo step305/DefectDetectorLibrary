@@ -7,6 +7,8 @@ import os
 import torch.nn.functional as nn_functional
 import numpy as np
 
+IMAGE_SIZE = (64, 64)
+
 
 class Classifier:
     def __init__(self, path_to_saved_model):
@@ -31,7 +33,8 @@ class Classifier:
         ])
 
     def test(self, image_to_test):
-        image_bw = cv2.cvtColor(image_to_test, cv2.COLOR_BGR2RGB)
+        image = cv2.resize(image_to_test, IMAGE_SIZE, cv2.INTER_LINEAR)
+        image_bw = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         image_bw = self.transform(image_bw)
         # add batch dimension
         image_bw = torch.unsqueeze(image_bw, 0)

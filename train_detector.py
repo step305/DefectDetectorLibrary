@@ -60,14 +60,14 @@ def train_detector():
                                                    step_size=3,
                                                    gamma=0.1)
 
-    num_epochs = 10
+    num_epochs = 301
 
     for i in range(num_epochs):
         train_one_epoch(model, optimizer, data_loader, TORCH_DEVICE, i, print_freq=10)
         lr_scheduler.step()
         evaluate(model, data_loader_test, device=TORCH_DEVICE)
 
-        if i % 5 == 0:
+        if i % 50 == 0:
             torch.save(model.state_dict(), 'detector\\models\\rcnn\\' + str(i) + ".torch")
             print("Saved model to:", str(i) + ".torch")
 

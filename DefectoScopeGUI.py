@@ -9,13 +9,31 @@ import os
 import net_test
 from detector import classifier
 from detector import detector_t
+import datetime
+from detector import analyzer
+import video_cam
+import multiprocessing as mp
 
 WINDOW_SIZE = (1024, 600)
 VIDEO_FRAME_SIZE = (768, 480)  # WVGA
 BUTTON_SIZE = (200, 100)
 BACKGROUND_COLOR = '#8C9787'
 
-plane_id = ''
+MODEL_DETECTOR_PATH = 'detector\\models\\rcnn\\300.torch'
+MODEL_CLASSIFIER_PATH = 'detector\\models\\classification_model.pth'
+
+net_analyzer = None
+camera = None
+stop_event = mp.Event()
+
+plane_id = {
+    'name': "",
+    'id': '',
+    'date': '',
+    'time': '',
+    'has_data': False,
+}
+
 record_on = False
 
 
@@ -29,14 +47,19 @@ def bgr_to_tk_image(image):
 
 def start_action(root):
     global plane_id
-    plane_id = simple_dlg.askstring('Input airplane name', 'ID', parent=root)
+    global net_analyzer
+    plane_id['name'] = simple_dlg.askstring('Input airplane name', 'Name', parent=root)
+    plane_id['id'] = simple_dlg.askstring('Input airplane serial number', 'ID', parent=root)
+    plane_id['date'] = datetime.datetime.now().strftime('%d.%m.%Y')
+    plane_id['time'] = datetime.datetime.now().strftime('%H:%M:%S')
     print(plane_id)
-    if plane_id is not None:
+    if plane_id['name'] is not None:
         capture_button['state'] = 'normal'
         record_button['state'] = 'normal'
         new_button['state'] = 'disabled'
         stop_button['state'] = 'normal'
         test_button['state'] = 'disabled'
+        net_analyzer = analyzer.DefectAnalyzer(MODEL_CLASSIFIER_PATH, MODEL_DETECTOR_PATH)
 
 
 def capture_action():
@@ -54,6 +77,7 @@ def record_action():
 
 
 def stop_action():
+    global net_analyzer
     capture_button['state'] = 'disabled'
     if record_on:
         record_action()
@@ -61,6 +85,12 @@ def stop_action():
     new_button['state'] = 'normal'
     stop_button['state'] = 'disabled'
     test_button['state'] = 'normal'
+    if net_analyzer is not None:
+        net_analyzer.stop()
+        net_analyzer = None
+
+    if plane_id['has_data']:
+        pass
     print('Stop')
 
 
@@ -154,12 +184,12 @@ def test_action(root):
     if test_type is not None:
         if test_type == 'Classifier':
             test_button['state'] = 'disabled'
-            net_test.run_test(classifier.Classifier, 'detector\\models\\classification_model.pth')
+            net_test.run_test(classifier.Classifier, MODEL_CLASSIFIER_PATH)
             test_wait_win = wait_window(root)
             root.after(100, wait_classifier_test_end, root, test_wait_win)
         elif test_type == 'Detector':
             test_button['state'] = 'disabled'
-            net_test.run_test(detector_t.Detector, 'detector\\models\\rcnn\\5.torch')
+            net_test.run_test(detector_t.Detector, MODEL_DETECTOR_PATH)
             test_wait_win = wait_window(root)
             root.after(100, wait_detector_test_end, root, test_wait_win)
 
@@ -180,9 +210,23 @@ def create_left_menu_button(icon, index, action):
 
 
 def on_closing(root):
+    stop_event.set()
+    if camera is not None:
+        camera.stop()
     stop_action()
     print('Exit')
     root.destroy()
+
+
+def update_action(root, video_panel):
+    global camera
+    img = camera.get()
+    if img is not None:
+        img = cv2.resize(img, VIDEO_FRAME_SIZE)
+        img_tk = bgr_to_tk_image(img)
+        #video_panel.configure(image=img_tk)
+    if not stop_event.is_set():
+        root.after(ms=30, func=lambda: update_action(root, video_panel))
 
 
 if __name__ == '__main__':
@@ -223,5 +267,9 @@ if __name__ == '__main__':
     test_button = create_left_menu_button(test_button_icon, 4, lambda: test_action(main_window))
 
     main_window.protocol("WM_DELETE_WINDOW", lambda: on_closing(main_window))
+
+    # camera = video_cam.VideoCamera(0)
+    # main_window.after(ms=10, func=lambda: update_action(main_window, video_out))
+
     main_window.update()
     main_window.mainloop()

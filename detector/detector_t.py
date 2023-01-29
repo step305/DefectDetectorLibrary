@@ -30,12 +30,27 @@ class Detector:
         self.transforms = get_transform(False)
 
     def test(self, image):
+        old_height, old_width, _ = image.shap
         image = cv2.resize(image, IMAGE_SIZE, cv2.INTER_LINEAR)
         img = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         im_pil = Image.fromarray(img)
         if self.transforms is not None:
             image, _ = self.transforms(im_pil, {})
-        return self.infer(image)
+        bboxes, scores = self.infer(image)
+        k_width = old_width / IMAGE_SIZE[0]
+        k_height = old_height / IMAGE_SIZE[1]
+        new_bboxes = []
+        for bbox in bboxes:
+            x1_, y1_, x2_, y2_ = bbox
+            new_bboxes.append(
+                (
+                    int(x1_ * k_width),
+                    int(y1_ * k_height),
+                    int(x2_ * k_width),
+                    int(y2_ * k_height)
+                )
+            )
+        return new_bboxes, scores
 
     def infer(self, image):
         images = [image.to(self.device)]
@@ -78,7 +93,7 @@ class Detector:
                 dict(
                     boxes=torch.tensor(boxes),
                     scores=torch.tensor(scores),
-                    labels=torch.tensor([1]*len(scores))
+                    labels=torch.tensor([1] * len(scores))
                 )
             ]
             metric.update(pred_metrics, target_metric)
