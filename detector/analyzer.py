@@ -8,8 +8,8 @@ def run_loop(class_model, detect_model, queue_in, queue_out, stop):
     from detector import classifier
     from detector import detector_t
 
-    net_classifier = classifier.Classifier(class_model)
     net_detector = detector_t.Detector(detect_model)
+    net_classifier = classifier.Classifier(class_model)
 
     while not stop.is_set():
         img = queue_in.get(block=True)
@@ -24,25 +24,25 @@ def run_loop(class_model, detect_model, queue_in, queue_out, stop):
             bboxes, scores = net_detector.test(img)
             result['bboxes'] = bboxes
             result['scores'] = scores
-            for bbox in bboxes:
+            for score, bbox in zip(scores, bboxes):
                 x1, y1, x2, y2 = bbox
                 img_small = img[y1:y2, x1:x2]
                 defect_type, prob = net_classifier.test(img_small)
                 result['types'].append(defect_type)
-                result['probs'].append(prob)
-                cv2.rectangle(img,
-                              (x1, y1),
-                              (x2, y2),
-                              color=(0, 0, 255),
-                              thickness=2)
-                cv2.putText(img,
-                            '{:.2f}% {:}'.format(prob * 100.0, defect_type),
-                            (x1, y1 - 10),
-                            fontFace=cv2.FONT_ITALIC,
-                            fontScale=0.4,
-                            thickness=1,
-                            color=(255, 0, 0))
-            result['image'] = img
+                result['probs'].append(prob * score)
+                # cv2.rectangle(img,
+                #               (x1, y1),
+                #               (x2, y2),
+                #               color=(0, 0, 255),
+                #               thickness=2)
+                # cv2.putText(img,
+                #             '{:.2f}% {:}'.format(prob * 100.0, defect_type),
+                #             (x1, y1 - 10),
+                #             fontFace=cv2.FONT_ITALIC,
+                #             fontScale=0.4,
+                #             thickness=1,
+                #             color=(255, 0, 0))
+            # result['image'] = img
             if not queue_out.full():
                 queue_out.put(result)
     print('Detector loop stopped!')
@@ -78,4 +78,4 @@ class DefectAnalyzer:
     def stop(self):
         self.stop_event.set()
         self.image_queue.put(None)
-        self.detector_proc.join()
+        self.detector_proc.terminate()

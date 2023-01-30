@@ -42,7 +42,7 @@ class Classifier:
             outputs = self.model(image_bw.to(self.target_device))
             probs = nn_functional.softmax(outputs, dim=-1)
         predicted_class_ = self.labels[torch.argmax(probs)]
-        probability_ = torch.max(probs)
+        probability_ = float(torch.max(probs).detach().cpu().numpy())
         return predicted_class_, probability_
 
     def verification(self):

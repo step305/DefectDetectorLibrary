@@ -13,6 +13,8 @@ import datetime
 from detector import analyzer
 import video_cam
 import multiprocessing as mp
+from database import defects_list
+from database import defects_base
 
 WINDOW_SIZE = (1024, 600)
 VIDEO_FRAME_SIZE = (768, 480)  # WVGA
@@ -22,10 +24,19 @@ BACKGROUND_COLOR = '#8C9787'
 MODEL_DETECTOR_PATH = 'detector\\models\\rcnn\\300.torch'
 MODEL_CLASSIFIER_PATH = 'detector\\models\\classification_model.pth'
 
+defect_database = defects_base.DefectsBase()
+
 net_analyzer = None
 camera = None
 stop_event = mp.Event()
+capture_event = mp.Event()
+record_event = mp.Event()
+vid_writer = None
 video_panel_image = None
+analyze_started = False
+bounding_boxes = []
+defect_types = []
+defect_scores = []
 
 plane_id = {
     'name': "",
@@ -53,6 +64,16 @@ def start_action(root):
     plane_id['id'] = simple_dlg.askstring('Input airplane serial number', 'ID', parent=root)
     plane_id['date'] = datetime.datetime.now().strftime('%d.%m.%Y')
     plane_id['time'] = datetime.datetime.now().strftime('%H:%M:%S')
+
+    plane_dir = os.path.join('data_analyzed', plane_id['name'] + '_' + plane_id['id'])
+    if not os.path.exists(plane_dir):
+        os.mkdir(plane_dir)
+    plane_dir = os.path.join(plane_dir, plane_id['date'] + '_' + plane_id['time'].replace(':', '_'))
+    os.mkdir(plane_dir)
+    plane_id['results'] = plane_dir
+    plane_id['capture_counter'] = 0
+    plane_id['record_counter'] = 0
+    plane_id['defects'] = defects_list.AirCraftDefectsList(plane_id['id'], plane_id['name'])
     print(plane_id)
     if plane_id['name'] is not None:
         capture_button['state'] = 'normal'
@@ -64,21 +85,36 @@ def start_action(root):
 
 
 def capture_action():
+    global capture_event
+    capture_event.set()
     print('Capture')
 
 
 def record_action():
     global record_on
+    global record_event
+    global vid_writer
+    global plane_id
+
     if not record_on:
         record_button['image'] = record_button_on_icon
         record_on = True
+        fourcc = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')
+        vid_writer = cv2.VideoWriter(os.path.join(plane_id['results'], str(plane_id['record_counter']) + '.mp4'),
+                                     fourcc, 30, (1280, 720))
+        record_event.set()
     else:
         record_button['image'] = record_button_off_icon
         record_on = False
+        record_event.clear()
+        vid_writer.release()
+        plane_id['record_counter'] += 1
 
 
 def stop_action():
     global net_analyzer
+    global plane_id
+
     capture_button['state'] = 'disabled'
     if record_on:
         record_action()
@@ -91,7 +127,9 @@ def stop_action():
         net_analyzer = None
 
     if plane_id['has_data']:
-        pass
+        defect_database.add(plane_id['defects'])
+        defect_database.report(plane_id['results'], plane_id['name'], plane_id['id'])
+        plane_id['has_data'] = False
     print('Stop')
 
 
@@ -219,17 +257,66 @@ def on_closing(root):
     root.destroy()
 
 
-def update_action(root, video_panel):
+def analyze_loop(root, video_panel):
     global camera
-    global video_panel_image
+    global analyze_started
+    global bounding_boxes
+    global defect_types
+    global defect_scores
+    global plane_id
+    global vid_writer
+
     img = camera.get()
     if img is not None:
+        if net_analyzer is not None:
+            if not analyze_started:
+                analyze_started = True
+                net_analyzer.test_start(img)
+            else:
+                res = net_analyzer.get()
+                if res is not None:
+                    bounding_boxes = res['bboxes']
+                    defect_scores = res['probs']
+                    defect_types = res['types']
+                    analyze_started = False
+            for def_type, def_score, bbox in zip(defect_types, defect_scores, bounding_boxes):
+                x1, y1, x2, y2 = bbox
+                cv2.rectangle(img,
+                              (x1, y1),
+                              (x2, y2),
+                              color=(0, 0, 255),
+                              thickness=2)
+                cv2.putText(img,
+                            '{:.2f}% {:}'.format(def_score * 100.0, def_type),
+                            (x1, y1 - 10),
+                            fontFace=cv2.FONT_ITALIC,
+                            fontScale=0.8,
+                            thickness=1,
+                            color=(255, 0, 0))
+        if capture_event.is_set():
+            cv2.imwrite(os.path.join(plane_id['results'], str(plane_id['capture_counter']) + '.jpg'), img)
+            plane_id['capture_counter'] += 1
+            if len(bounding_boxes) > 0:
+                plane_id['defects'].add(defects_list.DefectFrame(img, bounding_boxes, defect_scores, defect_types))
+                plane_id['has_data'] = True
+            capture_event.clear()
+
+        if record_event.is_set():
+            vid_writer.write(img)
+            if len(bounding_boxes):
+                plane_id['defects'].add(defects_list.DefectFrame(img, bounding_boxes, defect_scores, defect_types))
+                plane_id['has_data'] = True
         img = cv2.resize(img, VIDEO_FRAME_SIZE)
-        video_panel_image = bgr_to_tk_image(img)
-        video_panel.configure(image=video_panel_image)
-        video_panel.image = video_panel_image
+        update_action(video_panel, img)
     if not stop_event.is_set():
-        root.after(ms=30, func=lambda: update_action(root, video_panel))
+        root.after(ms=10, func=lambda: analyze_loop(root, video_panel))
+
+
+def update_action(video_panel, img):
+    global video_panel_image
+    video_panel_image = bgr_to_tk_image(img)
+    video_panel.configure(image=video_panel_image)
+    video_panel.image = video_panel_image
 
 
 if __name__ == '__main__':
@@ -271,8 +358,8 @@ if __name__ == '__main__':
 
     main_window.protocol("WM_DELETE_WINDOW", lambda: on_closing(main_window))
 
-    # camera = video_cam.VideoCamera(0)
-    # main_window.after(ms=10, func=lambda: update_action(main_window, video_out))
+    camera = video_cam.VideoCamera(0)
+    main_window.after(ms=10, func=lambda: analyze_loop(main_window, video_out))
 
     main_window.update()
     main_window.mainloop()

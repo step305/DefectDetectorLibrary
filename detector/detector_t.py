@@ -30,13 +30,13 @@ class Detector:
         self.transforms = get_transform(False)
 
     def test(self, image):
-        old_height, old_width, _ = image.shap
+        old_height, old_width, _ = image.shape
         image = cv2.resize(image, IMAGE_SIZE, cv2.INTER_LINEAR)
         img = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         im_pil = Image.fromarray(img)
         if self.transforms is not None:
-            image, _ = self.transforms(im_pil, {})
-        bboxes, scores = self.infer(image)
+            image_infer, _ = self.transforms(im_pil, {})
+        bboxes, scores = self.infer(image_infer)
         k_width = old_width / IMAGE_SIZE[0]
         k_height = old_height / IMAGE_SIZE[1]
         new_bboxes = []
@@ -54,12 +54,9 @@ class Detector:
 
     def infer(self, image):
         images = [image.to(self.device)]
-        if torch.cuda.is_available():
-            torch.cuda.synchronize()
 
         with torch.no_grad():
             pred = self.model(images)
-
         bboxes = []
         scores = []
         for i in range(len(pred[0]['labels'])):
