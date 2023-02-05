@@ -324,6 +324,7 @@ if __name__ == '__main__':
     main_window = center_window(main_window, WINDOW_SIZE)
     main_window.resizable(False, False)
     main_window.configure(bg=BACKGROUND_COLOR)
+    main_window.title("DefectoScope")
     # main_window.wm_attributes('-fullscreen', 'True')
 
     frame = np.random.randint(0, 255, size=(VIDEO_FRAME_SIZE[1], VIDEO_FRAME_SIZE[0], 3), dtype=np.uint8)

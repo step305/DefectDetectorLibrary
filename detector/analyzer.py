@@ -30,19 +30,6 @@ def run_loop(class_model, detect_model, queue_in, queue_out, stop):
                 defect_type, prob = net_classifier.test(img_small)
                 result['types'].append(defect_type)
                 result['probs'].append(prob * score)
-                # cv2.rectangle(img,
-                #               (x1, y1),
-                #               (x2, y2),
-                #               color=(0, 0, 255),
-                #               thickness=2)
-                # cv2.putText(img,
-                #             '{:.2f}% {:}'.format(prob * 100.0, defect_type),
-                #             (x1, y1 - 10),
-                #             fontFace=cv2.FONT_ITALIC,
-                #             fontScale=0.4,
-                #             thickness=1,
-                #             color=(255, 0, 0))
-            # result['image'] = img
             if not queue_out.full():
                 queue_out.put(result)
     print('Detector loop stopped!')

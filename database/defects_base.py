@@ -62,7 +62,7 @@ class DefectsBase:
         self.cursor = self.db_connection.cursor()
         sql_req = 'SELECT name, serial FROM airplanes;'
         self.cursor.execute(sql_req)
-        data, = self.cursor.fetchall()
+        data = self.cursor.fetchall()
         result = {
             'name': [],
             'serial': [],
